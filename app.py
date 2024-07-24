@@ -240,6 +240,9 @@ def batch_detect(face_detector, imgs, device):
     else:
         imgs = rgb_imgs
 
+    # Transpose the images to match the input shape required by the model
+    imgs = imgs.transpose(0, 3, 1, 2)
+
     # The rest of your batch_detect implementation...
     # Call face_detector to process the images
     bboxlists = face_detector.detect_from_batch(imgs)
