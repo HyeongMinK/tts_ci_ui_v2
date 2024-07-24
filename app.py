@@ -14,11 +14,15 @@ import argparse
 import audio
 from PIL import Image
 
+# 모델 체크포인트 다운로드 함수
+
 def download_checkpoint():
     checkpoint_path = 'checkpoints/wav2lip.pth'
     if not os.path.exists(checkpoint_path):
         url = 'https://drive.google.com/uc?id=1xhqGmoS2wrEbY1h4SCQcqYra4NpLt7fS'
         gdown.download(url, checkpoint_path, quiet=False)
+
+
 
 def text_to_speech(client, text, output_audio_path, input_voice):
     response = client.audio.speech.create(
@@ -36,9 +40,11 @@ def create_tts_files(api_key, txt_n, input_voice):
     audio_dir = os.path.join(current_dir, "audio_files")
     text_dir = os.path.join(current_dir, "text_files")
     
+    # audio_files 폴더가 없으면 생성
     if not os.path.exists(audio_dir):
         os.makedirs(audio_dir)
     
+    # 단일 텍스트 파일에 대해 TTS 수행
     text_file_path = os.path.join(text_dir, txt_n)
     with open(text_file_path, "r", encoding="utf-8") as text_file:
         text = text_file.read().strip()
@@ -46,6 +52,7 @@ def create_tts_files(api_key, txt_n, input_voice):
     output_audio_path = os.path.join(audio_dir, f"{os.path.splitext(txt_n)[0]}.wav")
     text_to_speech(client, text, output_audio_path, input_voice)
 
+# Wav2Lip 코드
 parser = argparse.ArgumentParser(description='Inference code to lip-sync videos in the wild using Wav2Lip models')
 
 parser.add_argument('--checkpoint_path', type=str, 
@@ -193,6 +200,8 @@ def datagen(frames, mels):
 mel_step_size = 16
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
+
+
 def _load(checkpoint_path):
     if device == 'cuda':
         checkpoint = torch.load(checkpoint_path)
@@ -200,6 +209,7 @@ def _load(checkpoint_path):
         checkpoint = torch.load(checkpoint_path,
                                 map_location=lambda storage, loc: storage)
     return checkpoint
+
 
 def load_model(path):
     global model
@@ -222,7 +232,7 @@ def main(face_path):
         raise ValueError('--face argument must be a valid path to video/image file')
 
     elif args.face.split('.')[1] in ['jpg', 'png', 'jpeg']:
-        full_frames = [cv2.imread(args.face, cv2.IMREAD_UNCHANGED)]
+        full_frames = [cv2.imread(args.face)]
         fps = args.fps
 
     else:
@@ -257,6 +267,7 @@ def main(face_path):
     
     result_filenames = []
     
+    # audio_files 폴더의 모든 오디오 파일에 대해 처리
     for audio_file_name in os.listdir(audio_dir):
         audio_file_path = os.path.join(audio_dir, audio_file_name)
         if not audio_file_path.endswith('.wav'):
@@ -300,6 +311,10 @@ def main(face_path):
                 model = load_model(args.checkpoint_path)
                 print ("Model loaded")
 
+                frame_h, frame_w = full_frames[0].shape[:-1]
+                out = cv2.VideoWriter('temp/result.avi', 
+                                        cv2.VideoWriter_fourcc(*'DIVX'), fps, (frame_w, frame_h))
+
             img_batch = torch.FloatTensor(np.transpose(img_batch, (0, 3, 1, 2))).to(device)
             mel_batch = torch.FloatTensor(np.transpose(mel_batch, (0, 3, 1, 2))).to(device)
 
@@ -310,25 +325,25 @@ def main(face_path):
             
             for p, f, c in zip(pred, frames, coords):
                 y1, y2, x1, x2 = c
-                p = cv2.resize(p.astype(np.uint8), (x2 - x1, y2 - y1), interpolation=cv2.INTER_LINEAR)
+                p = cv2.resize(p.astype(np.uint8), (x2 - x1, y2 - y1))
 
-                alpha_channel = f[..., 3] if f.shape[2] == 4 else np.ones(f.shape[:2], dtype=f.dtype) * 255
-                p_alpha = p[..., 3] if p.shape[2] == 4 else np.ones(p.shape[:2], dtype=p.dtype) * 255
+                f[y1:y2, x1:x2] = p
+                out.write(f)
 
-                blended_face = cv2.addWeighted(f[y1:y2, x1:x2, :3], alpha_channel[y1:y2, x1:x2] / 255.0, p[..., :3], p_alpha / 255.0, 0)
+        out.release()
 
-                f[y1:y2, x1:x2, :3] = blended_face
-                f[y1:y2, x1:x2, 3] = alpha_channel[y1:y2, x1:x2]  # 유지 기존 알파 채널
+        # 오디오 파일 이름을 기반으로 고유한 결과 파일 이름 생성
+        audio_filename = os.path.splitext(os.path.basename(audio_file_path))[0]
+        result_filename = f'results/result_voice_{audio_filename}.mp4'
+        command = 'ffmpeg -y -i {} -i {} -strict -2 -q:v 1 {}'.format(audio_file_path, 'temp/result.avi', result_filename)
+        subprocess.call(command, shell=platform.system() != 'Windows')
 
-                result_frame_path = f'temp/frames_{i:04d}.png'
-                cv2.imwrite(result_frame_path, f)
+        result_filenames.append(result_filename)
 
-        command = f'ffmpeg -y -r {fps} -i temp/frames_%04d.png -i {audio_file_path} -c:v libx264 -pix_fmt yuv420p -c:a aac {args.outfile}'
-        subprocess.call(command, shell=True)
-        result_filenames.append(args.outfile)
-
+    
     return result_filename
 
+# 폴더 내의 모든 파일 삭제 함수
 def clear_directory(directory):
     if os.path.exists(directory):
         for filename in os.listdir(directory):
@@ -343,6 +358,7 @@ def clear_directory(directory):
             except Exception as e:
                 st.error(f"Failed to delete {file_path}. Reason: {e}")
 
+
 if __name__ == '__main__':
     st.title("TTS 립싱크 영상 생성기")
 
@@ -351,7 +367,9 @@ if __name__ == '__main__':
 
     if not st.session_state.process_started:
         if st.button("영상 만들기 시작하기"):
+            # Streamlit 애플리케이션 시작 시 체크포인트 다운로드
             download_checkpoint()
+            # 다운로드 버튼이 눌리면 폴더 내의 모든 파일 삭제
             clear_directory("text_files")
             clear_directory("pic_files")
             clear_directory("results")
@@ -360,54 +378,68 @@ if __name__ == '__main__':
             st.rerun()
             
     if st.session_state.process_started:
-        api_key = os.getenv('OPENAI_API_KEY')
+        api_key = os.getenv('OPENAI_API_KEY')  # 환경 변수에서 API 키를 가져옵니다.
         if not api_key:
             raise ValueError("OPENAI_API_KEY 환경 변수가 설정되지 않았습니다.")
 
+        # 텍스트 파일 업로드 위젯 추가
         uploaded_file = st.file_uploader("TTS 생성을 위한 텍스트 파일을 업로드 하세요", type="txt")
 
         if uploaded_file is not None:
+            # 업로드된 파일을 text_files 폴더에 저장
             save_path = os.path.join("text_files", uploaded_file.name)
             
+            # 디렉토리가 없으면 생성
             if not os.path.exists("text_files"):
                 os.makedirs("text_files")
 
+            # 파일 저장
             with open(save_path, "wb") as f:
                 f.write(uploaded_file.getvalue())
             
+            # 업로드된 텍스트 파일의 내용을 읽고 화면에 표시
             with open(save_path, "r", encoding="utf-8") as f:
                 file_contents = f.read()
                 st.text_area("업로드된 텍스트 파일 내용", file_contents, height=150)
 
+        # 이미지 파일 업로드 위젯 추가
         uploaded_img_file = st.file_uploader("이미지 파일을 업로드 하세요", type=["jpg", "jpeg", "png"])
 
         if uploaded_img_file is not None:
+            # 업로드된 파일을 pic_files 폴더에 저장
             img_save_path = os.path.join("pic_files", uploaded_img_file.name)
             
+            # 디렉토리가 없으면 생성
             if not os.path.exists("pic_files"):
                 os.makedirs("pic_files")
 
+            # 파일 저장
             with open(img_save_path, "wb") as f:
                 f.write(uploaded_img_file.getvalue())
 
+            # 업로드된 이미지 파일을 열고 화면에 표시
             img = Image.open(img_save_path)
             st.image(img, caption="업로드된 이미지", width=200)
 
         if uploaded_file is not None and uploaded_img_file is not None:
             voice_options = ["alloy", "echo", "fable", "onyx", "nova", "shimmer"]
-            selected_voice = st.radio("Select a voice option for TTS", voice_options, index=1)
+            selected_voice = st.radio("Select a voice option for TTS", voice_options, index=1)  # Default to "Echo"
 
+            # 선택된 결과를 변수에 저장
             st.session_state.selected_voice = selected_voice
 
+            
+            # Streamlit 버튼을 추가하여 TTS 파일 생성 및 Wav2Lip 실행을 트리거
             if st.button("립싱크 영상 생성하기"):
                 clear_directory("audio_files")
                 clear_directory("results")
                 with st.spinner("TTS 파일 생성 중..."):
-                    create_tts_files(api_key, uploaded_file.name, st.session_state.selected_voice)
+                    create_tts_files(api_key,uploaded_file.name, st.session_state.selected_voice)  # TTS 파일 생성
 
                 with st.spinner("영상 파일 생성 중..."):
-                    result_filename = main(img_save_path)
+                    result_filename = main(img_save_path)  # Wav2Lip 실행 및 결과 파일 생성
 
+                # 결과 파일에 대해 다운로드 버튼 추가
                 if os.path.exists(result_filename):
                     clear_directory("text_files")
                     clear_directory("pic_files")
