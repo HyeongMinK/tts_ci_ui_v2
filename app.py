@@ -406,7 +406,7 @@ if __name__ == '__main__':
             with open(save_path, "wb") as f:
                 f.write(uploaded_file.getvalue())
             
-            with open(save_path, "r", encoding="utf-8") as f):
+            with open(save_path, "r", encoding="utf-8") as f:
                 file_contents = f.read()
                 st.text_area("업로드된 텍스트 파일 내용", file_contents, height=150)
 
