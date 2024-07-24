@@ -110,6 +110,9 @@ def get_smoothened_boxes(boxes, T):
     return boxes
 
 def face_detect(images):
+    # RGBA 이미지를 BGR로 변환하여 face detection 수행
+    images_bgr = [cv2.cvtColor(image, cv2.COLOR_BGRA2BGR) if image.shape[2] == 4 else image for image in images]
+
     detector = face_detection.FaceAlignment(face_detection.LandmarksType._2D, 
                                             flip_input=False, device=device)
 
@@ -118,8 +121,8 @@ def face_detect(images):
     while 1:
         predictions = []
         try:
-            for i in tqdm(range(0, len(images), batch_size)):
-                predictions.extend(detector.get_detections_for_batch(np.array(images[i:i + batch_size])))
+            for i in tqdm(range(0, len(images_bgr), batch_size)):
+                predictions.extend(detector.get_detections_for_batch(np.array(images_bgr[i:i + batch_size])))
         except RuntimeError:
             if batch_size == 1: 
                 raise RuntimeError('Image too big to run face detection on GPU. Please use the --resize_factor argument')
@@ -148,6 +151,7 @@ def face_detect(images):
 
     del detector
     return results 
+
 
 def datagen(frames, mels):
     img_batch, mel_batch, frame_batch, coords_batch = [], [], [], []
