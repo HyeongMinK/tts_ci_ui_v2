@@ -255,7 +255,7 @@ def main(face_path):
                 frame = cv2.resize(frame, (frame.shape[1] // args.resize_factor, frame.shape[0] // args.resize_factor))
 
             if args.rotate:
-                frame = cv2.rotate(frame, cv2.cv2.ROTATE_90_CLOCKWISE)
+                frame = cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE)
 
             y1, y2, x1, x2 = args.crop
             if x2 == -1: x2 = frame.shape[1]
@@ -309,15 +309,14 @@ def main(face_path):
         batch_size = args.wav2lip_batch_size
         gen = datagen(full_frames.copy(), mel_chunks)
 
+        # 결과 프레임들을 저장할 리스트
+        result_frames = []
+
         for i, (img_batch, mel_batch, frames, coords) in enumerate(tqdm(gen,
                                                                        total=int(np.ceil(float(len(mel_chunks)) / batch_size)))):
             if i == 0:
                 model = load_model(args.checkpoint_path)
                 print("Model loaded")
-
-                frame_h, frame_w = full_frames[0].shape[:-1]
-                out = cv2.VideoWriter('temp/result.avi',
-                                      cv2.VideoWriter_fourcc(*'DIVX'), fps, (frame_w, frame_h), isColor=True)
 
             img_batch = torch.FloatTensor(np.transpose(img_batch, (0, 3, 1, 2))).to(device)
             mel_batch = torch.FloatTensor(np.transpose(mel_batch, (0, 3, 1, 2))).to(device)
@@ -337,17 +336,32 @@ def main(face_path):
                 else:
                     f[y1:y2, x1:x2] = p
 
-                out.write(f)
+                result_frames.append(f)
 
-        out.release()
+        # 임시 디렉토리에 결과 프레임을 이미지 파일로 저장
+        temp_frame_dir = 'temp_frames'
+        os.makedirs(temp_frame_dir, exist_ok=True)
+        for idx, frame in enumerate(result_frames):
+            cv2.imwrite(os.path.join(temp_frame_dir, f'frame_{idx:04d}.png'), frame)
+
+        # ffmpeg를 사용하여 RGBA 이미지를 비디오로 변환
+        temp_video_path = 'temp/result.mp4'
+        command = f'ffmpeg -y -framerate {fps} -i {temp_frame_dir}/frame_%04d.png -c:v libx264 -pix_fmt yuv420p {temp_video_path}'
+        subprocess.call(command, shell=True)
 
         # 오디오 파일 이름을 기반으로 고유한 결과 파일 이름 생성
         audio_filename = os.path.splitext(os.path.basename(audio_file_path))[0]
         result_filename = f'results/result_voice_{audio_filename}.mp4'
-        command = 'ffmpeg -y -i {} -i {} -strict -2 -q:v 1 {}'.format(audio_file_path, 'temp/result.avi', result_filename)
+        command = f'ffmpeg -y -i {audio_file_path} -i {temp_video_path} -c:v copy -c:a aac {result_filename}'
         subprocess.call(command, shell=platform.system() != 'Windows')
 
         result_filenames.append(result_filename)
+
+        # 임시 디렉토리 및 파일 삭제
+        for file in os.listdir(temp_frame_dir):
+            os.remove(os.path.join(temp_frame_dir, file))
+        os.rmdir(temp_frame_dir)
+        os.remove(temp_video_path)
 
     return result_filenames
 
