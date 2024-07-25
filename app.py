@@ -14,6 +14,11 @@ import argparse
 import audio
 from PIL import Image
 import base64
+from backgroundremover import BackgroundRemover
+
+def remove_video_background(input_video, output_video):
+    remover = BackgroundRemover()
+    remover.remove_background_from_video(input_video, output_video)
 
 audio_ex_files = {
     "Alloy": "audio_sample/alloy.mp3",
@@ -467,6 +472,7 @@ if __name__ == '__main__':
 
                 with st.spinner("영상 파일 생성 중..."):
                     result_filename = main(img_save_path)  # Wav2Lip 실행 및 결과 파일 생성
+                    remove_video_background(result_filename, result_filename)
 
                 # 결과 파일에 대해 다운로드 버튼 추가
                 if os.path.exists(result_filename):
