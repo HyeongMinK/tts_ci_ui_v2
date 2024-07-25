@@ -444,7 +444,7 @@ if __name__ == '__main__':
                 img = Image.open(img_save_path)
                 st.image(img, caption="업로드된 이미지", width=200)
 
-                voice_options = ["alloy", "echo", "fable", "onyx", "nova", "shimmer"]
+                voice_options = ["Alloy", "Echo", "Fable", "Onyx", "Nova", "Shimmer"]
                 selected_voice = st.radio("Select a voice option for TTS", voice_options, index=0, help="Previews can be found [here](https://platform.openai.com/docs/guides/text-to-speech/voice-options)")
             with col2_file_uploader:
                 st.markdown("**Audio Samples:**")
