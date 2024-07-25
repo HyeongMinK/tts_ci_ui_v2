@@ -437,7 +437,7 @@ if __name__ == '__main__':
                 selected_voice = st.radio("Select a voice option for TTS", voice_options, index=0, help="Previews can be found [here](https://platform.openai.com/docs/guides/text-to-speech/voice-options)")
             with col2_file_uploader:
                 for name, file_path in audio_ex_files.items():
-                    st.subheader(name)
+                    st.write(f"**{name}**")
                     audio_bytes = open(file_path, "rb").read()
                     st.audio(audio_bytes, format='audio/mp3')
             
