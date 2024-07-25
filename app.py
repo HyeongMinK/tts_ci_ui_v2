@@ -110,9 +110,6 @@ def get_smoothened_boxes(boxes, T):
     return boxes
 
 def face_detect(images):
-    # RGBA 이미지를 BGR로 변환하여 face detection 수행
-    images_bgr = [cv2.cvtColor(image, cv2.COLOR_BGRA2BGR) if image.shape[2] == 4 else image for image in images]
-
     detector = face_detection.FaceAlignment(face_detection.LandmarksType._2D, 
                                             flip_input=False, device=device)
 
@@ -121,8 +118,8 @@ def face_detect(images):
     while 1:
         predictions = []
         try:
-            for i in tqdm(range(0, len(images_bgr), batch_size)):
-                predictions.extend(detector.get_detections_for_batch(np.array(images_bgr[i:i + batch_size])))
+            for i in tqdm(range(0, len(images), batch_size)):
+                predictions.extend(detector.get_detections_for_batch(np.array(images[i:i + batch_size])))
         except RuntimeError:
             if batch_size == 1: 
                 raise RuntimeError('Image too big to run face detection on GPU. Please use the --resize_factor argument')
@@ -152,27 +149,26 @@ def face_detect(images):
     del detector
     return results 
 
-
 def datagen(frames, mels):
     img_batch, mel_batch, frame_batch, coords_batch = [], [], [], []
 
     if args.box[0] == -1:
         if not args.static:
-            face_det_results = face_detect(frames)  # 얼굴 인식 수행
+            face_det_results = face_detect(frames) # BGR2RGB for CNN face detection
         else:
             face_det_results = face_detect([frames[0]])
     else:
         print('Using the specified bounding box instead of face detection...')
         y1, y2, x1, x2 = args.box
-        face_det_results = [[f[y1: y2, x1: x2], (y1, y2, x1, x2)] for f in frames]
+        face_det_results = [[f[y1: y2, x1:x2], (y1, y2, x1, x2)] for f in frames]
 
     for i, m in enumerate(mels):
-        idx = 0 if args.static else i % len(frames)
+        idx = 0 if args.static else i%len(frames)
         frame_to_save = frames[idx].copy()
         face, coords = face_det_results[idx].copy()
 
         face = cv2.resize(face, (args.img_size, args.img_size))
-
+            
         img_batch.append(face)
         mel_batch.append(m)
         frame_batch.append(frame_to_save)
@@ -182,9 +178,8 @@ def datagen(frames, mels):
             img_batch, mel_batch = np.asarray(img_batch), np.asarray(mel_batch)
 
             img_masked = img_batch.copy()
-            img_masked[:, args.img_size // 2:] = 0
+            img_masked[:, args.img_size//2:] = 0
 
-            # Ensure the input tensor has 8 channels: 4 for masked image + 4 for original image (including alpha channel)
             img_batch = np.concatenate((img_masked, img_batch), axis=3) / 255.
             mel_batch = np.reshape(mel_batch, [len(mel_batch), mel_batch.shape[1], mel_batch.shape[2], 1])
 
@@ -195,13 +190,12 @@ def datagen(frames, mels):
         img_batch, mel_batch = np.asarray(img_batch), np.asarray(mel_batch)
 
         img_masked = img_batch.copy()
-        img_masked[:, args.img_size // 2:] = 0
+        img_masked[:, args.img_size//2:] = 0
 
         img_batch = np.concatenate((img_masked, img_batch), axis=3) / 255.
         mel_batch = np.reshape(mel_batch, [len(mel_batch), mel_batch.shape[1], mel_batch.shape[2], 1])
 
         yield img_batch, mel_batch, frame_batch, coords_batch
-
 
 mel_step_size = 16
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -233,12 +227,12 @@ def load_model(path):
 
 def main(face_path):
     global full_frames, mel_chunks, model, detector, predictions, boxes
-    args.face = face_path
+    args.face=face_path
     if not os.path.isfile(args.face):
         raise ValueError('--face argument must be a valid path to video/image file')
 
     elif args.face.split('.')[1] in ['jpg', 'png', 'jpeg']:
-        full_frames = [cv2.imread(args.face, cv2.IMREAD_UNCHANGED)]  # 투명 채널 포함 읽기
+        full_frames = [cv2.imread(args.face)]
         fps = args.fps
 
     else:
@@ -254,10 +248,10 @@ def main(face_path):
                 video_stream.release()
                 break
             if args.resize_factor > 1:
-                frame = cv2.resize(frame, (frame.shape[1] // args.resize_factor, frame.shape[0] // args.resize_factor))
+                frame = cv2.resize(frame, (frame.shape[1]//args.resize_factor, frame.shape[0]//args.resize_factor))
 
             if args.rotate:
-                frame = cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE)
+                frame = cv2.rotate(frame, cv2.cv2.ROTATE_90_CLOCKWISE)
 
             y1, y2, x1, x2 = args.crop
             if x2 == -1: x2 = frame.shape[1]
@@ -267,12 +261,12 @@ def main(face_path):
 
             full_frames.append(frame)
 
-    print("Number of frames available for inference: " + str(len(full_frames)))
+    print ("Number of frames available for inference: "+str(len(full_frames)))
 
     audio_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "audio_files")
-
+    
     result_filenames = []
-
+    
     # audio_files 폴더의 모든 오디오 파일에 대해 처리
     for audio_file_name in os.listdir(audio_dir):
         audio_file_path = os.path.join(audio_dir, audio_file_name)
@@ -294,14 +288,14 @@ def main(face_path):
             raise ValueError('Mel contains nan! Using a TTS voice? Add a small epsilon noise to the wav file and try again')
 
         mel_chunks = []
-        mel_idx_multiplier = 80. / fps
+        mel_idx_multiplier = 80./fps 
         i = 0
         while 1:
             start_idx = int(i * mel_idx_multiplier)
             if start_idx + mel_step_size > len(mel[0]):
                 mel_chunks.append(mel[:, len(mel[0]) - mel_step_size:])
                 break
-            mel_chunks.append(mel[:, start_idx: start_idx + mel_step_size])
+            mel_chunks.append(mel[:, start_idx : start_idx + mel_step_size])
             i += 1
 
         print("Length of mel chunks: {}".format(len(mel_chunks)))
@@ -311,14 +305,15 @@ def main(face_path):
         batch_size = args.wav2lip_batch_size
         gen = datagen(full_frames.copy(), mel_chunks)
 
-        # 결과 프레임들을 저장할 리스트
-        result_frames = []
-
-        for i, (img_batch, mel_batch, frames, coords) in enumerate(tqdm(gen,
-                                                                       total=int(np.ceil(float(len(mel_chunks)) / batch_size)))):
+        for i, (img_batch, mel_batch, frames, coords) in enumerate(tqdm(gen, 
+                                                total=int(np.ceil(float(len(mel_chunks))/batch_size)))):
             if i == 0:
                 model = load_model(args.checkpoint_path)
-                print("Model loaded")
+                print ("Model loaded")
+
+                frame_h, frame_w = full_frames[0].shape[:-1]
+                out = cv2.VideoWriter('temp/result.avi', 
+                                        cv2.VideoWriter_fourcc(*'DIVX'), fps, (frame_w, frame_h))
 
             img_batch = torch.FloatTensor(np.transpose(img_batch, (0, 3, 1, 2))).to(device)
             mel_batch = torch.FloatTensor(np.transpose(mel_batch, (0, 3, 1, 2))).to(device)
@@ -327,45 +322,26 @@ def main(face_path):
                 pred = model(mel_batch, img_batch)
 
             pred = pred.cpu().numpy().transpose(0, 2, 3, 1) * 255.
-
+            
             for p, f, c in zip(pred, frames, coords):
                 y1, y2, x1, x2 = c
                 p = cv2.resize(p.astype(np.uint8), (x2 - x1, y2 - y1))
 
-                if p.shape[2] == 4:  # 투명 채널이 있는 경우
-                    f[y1:y2, x1:x2, :3] = p[:, :, :3]
-                    f[y1:y2, x1:x2, 3] = p[:, :, 3]
-                else:
-                    f[y1:y2, x1:x2] = p
+                f[y1:y2, x1:x2] = p
+                out.write(f)
 
-                result_frames.append(f)
-
-        # 임시 디렉토리에 결과 프레임을 이미지 파일로 저장
-        temp_frame_dir = 'temp_frames'
-        os.makedirs(temp_frame_dir, exist_ok=True)
-        for idx, frame in enumerate(result_frames):
-            cv2.imwrite(os.path.join(temp_frame_dir, f'frame_{idx:04d}.png'), frame)
-
-        # ffmpeg를 사용하여 RGBA 이미지를 비디오로 변환
-        temp_video_path = 'temp/result.mp4'
-        command = f'ffmpeg -y -framerate {fps} -i {temp_frame_dir}/frame_%04d.png -c:v libx264 -pix_fmt yuv420p {temp_video_path}'
-        subprocess.call(command, shell=True)
+        out.release()
 
         # 오디오 파일 이름을 기반으로 고유한 결과 파일 이름 생성
         audio_filename = os.path.splitext(os.path.basename(audio_file_path))[0]
         result_filename = f'results/result_voice_{audio_filename}.mp4'
-        command = f'ffmpeg -y -i {audio_file_path} -i {temp_video_path} -c:v copy -c:a aac {result_filename}'
+        command = 'ffmpeg -y -i {} -i {} -strict -2 -q:v 1 {}'.format(audio_file_path, 'temp/result.avi', result_filename)
         subprocess.call(command, shell=platform.system() != 'Windows')
 
         result_filenames.append(result_filename)
 
-        # 임시 디렉토리 및 파일 삭제
-        for file in os.listdir(temp_frame_dir):
-            os.remove(os.path.join(temp_frame_dir, file))
-        os.rmdir(temp_frame_dir)
-        os.remove(temp_video_path)
-
-    return result_filenames
+    
+    return result_filename
 
 # 폴더 내의 모든 파일 삭제 함수
 def clear_directory(directory):
