@@ -367,6 +367,16 @@ def clear_directory(directory):
             except Exception as e:
                 st.error(f"Failed to delete {file_path}. Reason: {e}")
 
+def get_audio_html(file_path):
+    audio_bytes = open(file_path, "rb").read()
+    b64_audio = base64.b64encode(audio_bytes).decode()
+    audio_html = f"""
+    <audio controls style="width:150px; height:20px;">
+        <source src="data:audio/mp3;base64,{b64_audio}" type="audio/mp3">
+    </audio>
+    """
+    return audio_html
+
 
 if __name__ == '__main__':
     st.title("TTS 립싱크 영상 생성기")
@@ -436,14 +446,10 @@ if __name__ == '__main__':
                 voice_options = ["alloy", "echo", "fable", "onyx", "nova", "shimmer"]
                 selected_voice = st.radio("Select a voice option for TTS", voice_options, index=0, help="Previews can be found [here](https://platform.openai.com/docs/guides/text-to-speech/voice-options)")
             with col2_file_uploader:
+                st.markdown("**Audio Samples:**")
                 for name, file_path in audio_ex_files.items():
                     st.write(f"**{name}**")
-                    audio_bytes = open(file_path, "rb").read()
-                    audio_html = f"""
-                    <audio controls style="width:100px; height:20px;">
-                        <source src="data:audio/mp3;base64,{audio_bytes.encode('base64').decode()}" type="audio/mp3">
-                    </audio>
-                    """
+                    audio_html = get_audio_html(file_path)
                     st.markdown(audio_html, unsafe_allow_html=True)
             
 
