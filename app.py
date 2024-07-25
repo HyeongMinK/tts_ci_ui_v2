@@ -14,6 +14,15 @@ import argparse
 import audio
 from PIL import Image
 
+audio_ex_files = {
+    "Alloy": "audio_sample/alloy.mp3",
+    "Echo": "audio_sample/echo.mp3",
+    "Fable": "audio_sample/fable.mp3",
+    "Onyx": "audio_sample/onyx.mp3",
+    "Nova": "audio_sample/nova.mp3",
+    "Shimmer": "audio_sample/shimmer.mp3"
+}
+
 # 모델 체크포인트 다운로드 함수
 
 def download_checkpoint():
@@ -422,8 +431,16 @@ if __name__ == '__main__':
             st.image(img, caption="업로드된 이미지", width=200)
 
         if uploaded_file is not None and uploaded_img_file is not None:
-            voice_options = ["alloy", "echo", "fable", "onyx", "nova", "shimmer"]
-            selected_voice = st.radio("Select a voice option for TTS", voice_options, index=0, help="Previews can be found [here](https://platform.openai.com/docs/guides/text-to-speech/voice-options)")
+            col1_tone, col2_file_uploader = st.columns([1, 1])
+            with col1_tone:
+                voice_options = ["alloy", "echo", "fable", "onyx", "nova", "shimmer"]
+                selected_voice = st.radio("Select a voice option for TTS", voice_options, index=0, help="Previews can be found [here](https://platform.openai.com/docs/guides/text-to-speech/voice-options)")
+            with col2_file_uploader:
+                for name, file_path in audio_files.items():
+                    st.subheader(name)
+                    audio_bytes = open(file_path, "rb").read()
+                    st.audio(audio_bytes, format='audio/mp3')
+            
 
             # 선택된 결과를 변수에 저장
             st.session_state.selected_voice = selected_voice
