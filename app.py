@@ -423,7 +423,7 @@ if __name__ == '__main__':
 
         if uploaded_file is not None and uploaded_img_file is not None:
             voice_options = ["alloy", "echo", "fable", "onyx", "nova", "shimmer"]
-            selected_voice = st.radio("Select a voice option for TTS", voice_options, index=1)  # Default to "Echo"
+            selected_voice = st.radio("Select a voice option for TTS", voice_options, index=0, help="Previews can be found [here](https://platform.openai.com/docs/guides/text-to-speech/voice-options)")
 
             # 선택된 결과를 변수에 저장
             st.session_state.selected_voice = selected_voice
