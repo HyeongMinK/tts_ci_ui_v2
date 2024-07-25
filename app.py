@@ -422,7 +422,7 @@ if __name__ == '__main__':
                 img_save_path = os.path.join("pic_files", uploaded_img_file.name)
             
                 # 디렉토리가 없으면 생성
-                if. not os.path.exists("pic_files"):
+                if not os.path.exists("pic_files"):
                     os.makedirs("pic_files")
 
             # 파일 저장
