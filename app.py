@@ -439,7 +439,12 @@ if __name__ == '__main__':
                 for name, file_path in audio_ex_files.items():
                     st.write(f"**{name}**")
                     audio_bytes = open(file_path, "rb").read()
-                    st.audio(audio_bytes, format='audio/mp3')
+                    audio_html = f"""
+                    <audio controls style="width:100px; height:20px;">
+                        <source src="data:audio/mp3;base64,{audio_bytes.encode('base64').decode()}" type="audio/mp3">
+                    </audio>
+                    """
+                    st.markdown(audio_html, unsafe_allow_html=True)
             
 
             # 선택된 결과를 변수에 저장
