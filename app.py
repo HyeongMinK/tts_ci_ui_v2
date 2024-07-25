@@ -480,3 +480,24 @@ if __name__ == '__main__':
                             file_name=os.path.basename(result_filename),
                             mime="video/mp4"
                         )
+st.markdown(
+    """
+    <style>
+    .small-text {
+        font-size: 10px;   /* 글씨 크기 설정 */
+        color: gray;       /* 텍스트 색상 설정 */
+        position: relative;/* 상대 위치 설정 */
+        bottom: -150px;    /* 페이지 하단에서 150px 위로 */
+        width: 100%;       /* 너비를 페이지 전체로 설정 */
+        text-align: right;/* 가운데 정렬 */
+        background-color: white; /* 배경색 설정 */
+        line-height: 1.2;  /* 줄 간격 설정 */
+    }
+    </style>
+    <p class="small-text">Digital Wellness Lab 2024<br>
+        Business Analytics, School of Management<br>
+        Kyung Hee University<br>
+        Maintained by HyeongMin Kim & Sangwon Kim</p>
+    """,
+    unsafe_allow_html=True
+)
