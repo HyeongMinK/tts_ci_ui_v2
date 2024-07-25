@@ -15,12 +15,12 @@ import audio
 from PIL import Image
 
 audio_ex_files = {
-    "Alloy": "audio_sample/alloy.mp3",
-    "Echo": "audio_sample/echo.mp3",
-    "Fable": "audio_sample/fable.mp3",
-    "Onyx": "audio_sample/onyx.mp3",
-    "Nova": "audio_sample/nova.mp3",
-    "Shimmer": "audio_sample/shimmer.mp3"
+    "Alloy": "audio_sample\alloy.mp3",
+    "Echo": "audio_sample\echo.mp3",
+    "Fable": "audio_sample\fable.mp3",
+    "Onyx": "audio_sample\onyx.mp3",
+    "Nova": "audio_sample\nova.mp3",
+    "Shimmer": "audio_sample\shimmer.mp3"
 }
 
 # 모델 체크포인트 다운로드 함수
