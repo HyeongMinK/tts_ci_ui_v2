@@ -449,7 +449,7 @@ if __name__ == '__main__':
             with col2_file_uploader:
                 st.markdown("**Audio Samples:**")
                 for name, file_path in audio_ex_files.items():
-                    st.write(f"**{name}**")
+                    st.write(f"***{name}***")
                     audio_html = get_audio_html(file_path)
                     st.markdown(audio_html, unsafe_allow_html=True)
             
