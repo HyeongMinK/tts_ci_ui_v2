@@ -372,7 +372,7 @@ def get_audio_html(file_path):
     audio_bytes = open(file_path, "rb").read()
     b64_audio = base64.b64encode(audio_bytes).decode()
     audio_html = f"""
-    <audio controls style="width:150px; height:20px;">
+    <audio controls style="width:300px; height:25px;">
         <source src="data:audio/mp3;base64,{b64_audio}" type="audio/mp3">
     </audio>
     """
