@@ -365,7 +365,7 @@ def main(face_path):
 
         audio_filename = os.path.splitext(os.path.basename(audio_file_path))[0]
         result_filename = f'results/result_voice_{audio_filename}.mov'
-        command = 'ffmpeg -y -i {} -i {} -c:v qtrle -c:a copy {}'.format(audio_file_path, 'temp/result.avi', result_filename)
+        command = 'ffmpeg -y -i {} -i {} -c:v qtrle -c:a copy -pix_fmt rgba {}'.format(audio_file_path, 'temp/result.avi', result_filename)
         subprocess.call(command, shell=platform.system() != 'Windows')
 
         result_filenames.append(result_filename)
