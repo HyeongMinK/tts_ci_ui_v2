@@ -14,6 +14,7 @@ import argparse
 import audio
 from PIL import Image
 import base64
+from torch import nn  # 추가된 부분
 
 
 audio_ex_files = {
