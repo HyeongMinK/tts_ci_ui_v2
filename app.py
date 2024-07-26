@@ -371,6 +371,7 @@ def main(face_path):
     '-i {} -i {} -c:v qtrle -pix_fmt yuv420p -c:a copy {}'
 ).format('temp/result.avi', audio_file_path, result_filename)
 
+
         subprocess.call(command, shell=True)
 
 
