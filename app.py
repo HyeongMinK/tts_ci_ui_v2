@@ -724,7 +724,7 @@ def main(face_path):
                 print ("Model loaded")
 
                 frame_h, frame_w = full_frames[0].shape[:-1]
-                out = cv2.VideoWriter('temp/result.avi', 
+                out = cv2.VideoWriter('temp/result.mov', 
                                         cv2.VideoWriter_fourcc(*'DIVX'), fps, (frame_w, frame_h))
 
             img_batch = torch.FloatTensor(np.transpose(img_batch, (0, 3, 1, 2))).to(device)
