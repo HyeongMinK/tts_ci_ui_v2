@@ -131,7 +131,9 @@ def face_detect(images):
         predictions = []
         try:
             for i in tqdm(range(0, len(images), batch_size)):
-                predictions.extend(detector.get_detections_for_batch(np.array(images[i:i + batch_size])))
+                # RGBA 이미지를 RGB로 변환
+                rgb_images = [cv2.cvtColor(img, cv2.COLOR_RGBA2RGB) if img.shape[2] == 4 else img for img in images[i:i + batch_size]]
+                predictions.extend(detector.get_detections_for_batch(np.array(rgb_images)))
         except RuntimeError:
             if batch_size == 1: 
                 raise RuntimeError('Image too big to run face detection on GPU. Please use the --resize_factor argument')
@@ -156,10 +158,11 @@ def face_detect(images):
 
     boxes = np.array(results)
     if not args.nosmooth: boxes = get_smoothened_boxes(boxes, T=5)
-    results = [[image[y1: y2, x1:x2], (y1, y2, x1, x2)] for image, (x1, y1, x2, y2) in zip(images, boxes)]
+    results = [[image[y1: y2, x1:x2], (y1, y2, x1, x2)] for image, (x1, y1, x2, x2) in zip(images, boxes)]
 
     del detector
     return results 
+ 
 
 def datagen(frames, mels):
     img_batch, mel_batch, frame_batch, coords_batch = [], [], [], []
