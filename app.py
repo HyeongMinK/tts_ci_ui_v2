@@ -340,7 +340,7 @@ def main(face_path):
 
                 frame_h, frame_w = full_frames[0].shape[:-1]
                 out = cv2.VideoWriter('temp/result.mov',
-                                      cv2.VideoWriter_fourcc(*'qt  '), fps, (frame_w, frame_h), isColor=True)
+                                      cv2.VideoWriter_fourcc(*'qt  '), fps, (frame_w, frame_h), isColor=False)
 
 
             img_batch = torch.FloatTensor(np.transpose(img_batch, (0, 3, 1, 2))).to(device)
@@ -753,7 +753,7 @@ def main(face_path):
         result_filenames.append(result_filename)
 
     
-    return 'temp/result.mov'
+    return result_filename
 
 # 폴더 내의 모든 파일 삭제 함수
 def clear_directory(directory):
