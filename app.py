@@ -367,9 +367,9 @@ def main(face_path):
         audio_filename = os.path.splitext(os.path.basename(audio_file_path))[0]
         result_filename = f'results/result_voice_{audio_filename}.mov'
         command = (
-    'ffmpeg -y -analyzeduration 100M -probesize 100M '
-    '-i {} -i {} -c:v qtrle -pix_fmt yuv420p -c:a copy {}'
-).format('temp/result.mov', audio_file_path, result_filename)
+            'ffmpeg -y -analyzeduration 100M -probesize 100M '
+            '-i {} -i {} -c:v qtrle -c:a copy -pix_fmt rgba {}'.format(audio_file_path, 'temp/result.avi', result_filename)
+        )
 
 
         subprocess.call(command, shell=True)
