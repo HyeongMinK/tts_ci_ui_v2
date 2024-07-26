@@ -350,12 +350,17 @@ def main(face_path):
                 pred = model(mel_batch, img_batch)
 
             pred = pred.cpu().numpy().transpose(0, 2, 3, 1) * 255.
-            
+
             for p, f, c in zip(pred, frames, coords):
                 y1, y2, x1, x2 = c
                 p = cv2.resize(p.astype(np.uint8), (x2 - x1, y2 - y1))
 
-                f[y1:y2, x1:x2] = p
+                if p.shape[2] == 4:  # 투명 채널이 있는 경우
+                    f[y1:y2, x1:x2, :3] = p[:, :, :3]
+                    f[y1:y2, x1:x2, 3] = p[:, :, 3]
+                else:
+                    f[y1:y2, x1:x2] = p
+
                 out.write(f)
 
         out.release()
