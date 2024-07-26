@@ -339,7 +339,7 @@ def main(face_path):
                 print("Model loaded")
 
                 frame_h, frame_w = full_frames[0].shape[:-1]
-                out = cv2.VideoWriter('temp/result.avi',
+                out = cv2.VideoWriter('temp/result.mov',
                       cv2.VideoWriter_fourcc(*'DIVX'), fps, (frame_w, frame_h), isColor=False)  # isColor=False로 설정하여 필요한 경우 그레이스케일 픽셀 형식 사용
 
 
@@ -366,18 +366,18 @@ def main(face_path):
 
         audio_filename = os.path.splitext(os.path.basename(audio_file_path))[0]
         result_filename = f'results/result_voice_{audio_filename}.mov'
-        #command = (
-    #'ffmpeg -y -analyzeduration 100M -probesize 100M '
-    #'-i {} -i {} -c:v qtrle -pix_fmt yuv420p -c:a copy {}'
-#).format('temp/result.avi', audio_file_path, result_filename)
+        command = (
+    'ffmpeg -y -analyzeduration 100M -probesize 100M '
+    '-i {} -i {} -c:v qtrle -pix_fmt yuv420p -c:a copy {}'
+).format('temp/result.mov', audio_file_path, result_filename)
 
 
-        #subprocess.call(command, shell=True)
+        subprocess.call(command, shell=True)
 
 
         result_filenames.append(result_filename)
 
-    return 'temp/result.avi'
+    return result_filename
 
 
 
