@@ -15,6 +15,7 @@ import audio
 from PIL import Image
 import base64
 from torch import nn  # 추가된 부분
+from moviepy.editor import ImageSequenceClip
 
 
 audio_ex_files = {
@@ -332,16 +333,13 @@ def main(face_path):
         batch_size = args.wav2lip_batch_size
         gen = datagen(full_frames.copy(), mel_chunks)
 
+        video_frames = []  # 비디오 프레임을 저장할 리스트
+
         for i, (img_batch, mel_batch, frames, coords) in enumerate(tqdm(gen,
                                                                         total=int(np.ceil(float(len(mel_chunks)) / batch_size)))):
             if i == 0:
                 model = load_model(args.checkpoint_path)
                 print("Model loaded")
-
-                frame_h, frame_w = full_frames[0].shape[:-1]
-                out = cv2.VideoWriter('temp/result.mov',
-                                      cv2.VideoWriter_fourcc(*'qt  '), fps, (frame_w, frame_h), isColor=False)
-
 
             img_batch = torch.FloatTensor(np.transpose(img_batch, (0, 3, 1, 2))).to(device)
             mel_batch = torch.FloatTensor(np.transpose(mel_batch, (0, 3, 1, 2))).to(device)
@@ -364,9 +362,11 @@ def main(face_path):
                 else:  # 투명 채널이 없는 경우
                     f[y1:y2, x1:x2] = p
 
-                out.write(f)
+                video_frames.append(f)
 
-        out.release()
+        # moviepy를 사용하여 비디오 생성
+        clip = ImageSequenceClip(video_frames, fps=fps)
+        clip.write_videofile('temp/result.mov', codec='libx264', pix_fmt='rgba')
 
         audio_filename = os.path.splitext(os.path.basename(audio_file_path))[0]
         result_filename = f'results/result_voice_{audio_filename}.mov'
@@ -376,10 +376,9 @@ def main(face_path):
         ).format('temp/result.mov', audio_file_path, result_filename)
         subprocess.call(command, shell=platform.system() != 'Windows')
 
-
         result_filenames.append(result_filename)
 
-    return result_filename
+    return result_filenames
 
 
 
