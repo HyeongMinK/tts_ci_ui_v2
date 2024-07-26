@@ -13,6 +13,7 @@ from models import Wav2Lip
 import argparse
 import audio
 from PIL import Image
+import base64
 
 
 audio_ex_files = {
