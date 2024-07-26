@@ -379,7 +379,7 @@ def main(face_path):
 
         result_filenames.append(result_filename)
 
-    return 'temp/result.mov'
+    return result_filename
 
 
 
@@ -753,7 +753,7 @@ def main(face_path):
         result_filenames.append(result_filename)
 
     
-    return result_filename
+    return 'temp/result.mov'
 
 # 폴더 내의 모든 파일 삭제 함수
 def clear_directory(directory):
