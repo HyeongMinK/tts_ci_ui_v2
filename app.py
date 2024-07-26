@@ -239,13 +239,14 @@ def load_model(path):
 
     # 6채널에서 8채널로 변경된 첫 번째 레이어 초기화
     with torch.no_grad():
-        conv1_weight = new_s['face_encoder_blocks.0.0.conv_block.0.weight']
+        conv1_weight = model.face_encoder_blocks[0][0].conv_block[0].weight
         new_weight = torch.zeros((conv1_weight.shape[0], 8, conv1_weight.shape[2], conv1_weight.shape[3]))
         new_weight[:, :6, :, :] = conv1_weight
         model.face_encoder_blocks[0][0].conv_block[0].weight = nn.Parameter(new_weight)
 
     model = model.to(device)
     return model.eval()
+
 
 
 def main(face_path):
