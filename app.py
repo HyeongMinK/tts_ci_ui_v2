@@ -340,7 +340,7 @@ def main(face_path):
 
                 frame_h, frame_w = full_frames[0].shape[:-1]
                 out = cv2.VideoWriter('temp/result.mov',
-                      cv2.VideoWriter_fourcc(*'DIVX'), fps, (frame_w, frame_h))  # isColor=False로 설정하여 필요한 경우 그레이스케일 픽셀 형식 사용
+                                      cv2.VideoWriter_fourcc(*'qt  '), fps, (frame_w, frame_h), isColor=True)
 
 
             img_batch = torch.FloatTensor(np.transpose(img_batch, (0, 3, 1, 2))).to(device)
@@ -366,7 +366,10 @@ def main(face_path):
 
         audio_filename = os.path.splitext(os.path.basename(audio_file_path))[0]
         result_filename = f'results/result_voice_{audio_filename}.mov'
-        command = 'ffmpeg -y -i {} -i {} -strict -2 -q:v 1 {}'.format(audio_file_path, 'temp/result.mov', result_filename)
+        command = (
+            'ffmpeg -y -analyzeduration 100M -probesize 100M '
+            '-i {} -i {} -c:v qtrle -c:a copy -pix_fmt rgba {}'
+        ).format('temp/result.mov', audio_file_path, result_filename)
         subprocess.call(command, shell=platform.system() != 'Windows')
 
 
