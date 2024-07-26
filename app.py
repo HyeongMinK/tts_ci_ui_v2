@@ -259,7 +259,7 @@ def main(face_path):
     if not os.path.isfile(args.face):
         raise ValueError('--face argument must be a valid path to video/image file')
 
-    elif args.face.split('.')[1] in ['jpg', 'png', 'jpeg']:
+    elif args.face.split('.')[-1] in ['jpg', 'png', 'jpeg']:
         full_frames = [cv2.imread(args.face, cv2.IMREAD_UNCHANGED)]  # RGBA로 읽기
         fps = args.fps
 
@@ -301,12 +301,6 @@ def main(face_path):
             print(f'Skipping non-wav file: {audio_file_path}')
             continue
 
-        if not audio_file_path.endswith('.wav'):
-            print('Extracting raw audio...')
-            command = 'ffmpeg -y -i {} -strict -2 {}'.format(audio_file_path, 'temp/temp.wav')
-            subprocess.call(command, shell=True)
-            audio_file_path = 'temp/temp.wav'
-
         wav = audio.load_wav(audio_file_path, 16000)
         mel = audio.melspectrogram(wav)
         print(mel.shape)
@@ -332,16 +326,13 @@ def main(face_path):
         batch_size = args.wav2lip_batch_size
         gen = datagen(full_frames.copy(), mel_chunks)
 
-        for i, (img_batch, mel_batch, frames, coords) in enumerate(tqdm(gen,
-                                                                        total=int(np.ceil(float(len(mel_chunks)) / batch_size)))):
+        for i, (img_batch, mel_batch, frames, coords) in enumerate(tqdm(gen, total=int(np.ceil(float(len(mel_chunks)) / batch_size)))):
             if i == 0:
                 model = load_model(args.checkpoint_path)
                 print("Model loaded")
 
                 frame_h, frame_w = full_frames[0].shape[:-1]
-                out = cv2.VideoWriter('temp/result.mov',
-                      cv2.VideoWriter_fourcc(*'DIVX'), fps, (frame_w, frame_h), isColor=False)  # isColor=False로 설정하여 필요한 경우 그레이스케일 픽셀 형식 사용
-
+                out = cv2.VideoWriter('temp/result.avi', cv2.VideoWriter_fourcc(*'DIVX'), fps, (frame_w, frame_h), True)
 
             img_batch = torch.FloatTensor(np.transpose(img_batch, (0, 3, 1, 2))).to(device)
             mel_batch = torch.FloatTensor(np.transpose(mel_batch, (0, 3, 1, 2))).to(device)
@@ -366,16 +357,17 @@ def main(face_path):
 
         audio_filename = os.path.splitext(os.path.basename(audio_file_path))[0]
         result_filename = f'results/result_voice_{audio_filename}.mov'
+        
         command = (
-        'ffmpeg -y -analyzeduration 100M -probesize 100M '
-        '-i {} -i {} -c:v qtrle -c:a copy -pix_fmt rgba {}'
-    ).format('temp/result.mov', audio_file_path, result_filename)
-        subprocess.call(command, shell=True)
-
+            'ffmpeg -y -analyzeduration 100M -probesize 100M '
+            '-i {} -i {} -c:v qtrle -c:a aac -strict -2 -b:a 192k -pix_fmt rgba {}'
+        ).format('temp/result.avi', audio_file_path, result_filename)
+        
+        subprocess.call(command, shell=platform.system() != 'Windows')
 
         result_filenames.append(result_filename)
 
-    return result_filename
+    return result_filenames
 
 
 
