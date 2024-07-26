@@ -254,7 +254,46 @@ def load_model(path):
 
 
 def main(face_path):
-    # 기존 코드 ...
+    global full_frames, mel_chunks, model, detector, predictions, boxes
+    args.face = face_path
+    if not os.path.isfile(args.face):
+        raise ValueError('--face argument must be a valid path to video/image file')
+
+    elif args.face.split('.')[1] in ['jpg', 'png', 'jpeg']:
+        full_frames = [cv2.imread(args.face, cv2.IMREAD_UNCHANGED)]  # RGBA로 읽기
+        fps = args.fps
+
+    else:
+        video_stream = cv2.VideoCapture(args.face)
+        fps = video_stream.get(cv2.CAP_PROP_FPS)
+
+        print('Reading video frames...')
+
+        full_frames = []
+        while 1:
+            still_reading, frame = video_stream.read()
+            if not still_reading:
+                video_stream.release()
+                break
+            if args.resize_factor > 1:
+                frame = cv2.resize(frame, (frame.shape[1] // args.resize_factor, frame.shape[0] // args.resize_factor))
+
+            if args.rotate:
+                frame = cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE)
+
+            y1, y2, x1, x2 = args.crop
+            if x2 == -1: x2 = frame.shape[1]
+            if y2 == -1: y2 = frame.shape[0]
+
+            frame = frame[y1:y2, x1:x2]
+
+            full_frames.append(frame)
+
+    print("Number of frames available for inference: " + str(len(full_frames)))
+
+    audio_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "audio_files")
+
+    result_filenames = []
 
     for audio_file_name in os.listdir(audio_dir):
         audio_file_path = os.path.join(audio_dir, audio_file_name)
@@ -262,11 +301,19 @@ def main(face_path):
             print(f'Skipping non-wav file: {audio_file_path}')
             continue
 
-        # 오디오 및 mel 로드
+        if not audio_file_path.endswith('.wav'):
+            print('Extracting raw audio...')
+            command = 'ffmpeg -y -i {} -strict -2 {}'.format(audio_file_path, 'temp/temp.wav')
+            subprocess.call(command, shell=True)
+            audio_file_path = 'temp/temp.wav'
+
         wav = audio.load_wav(audio_file_path, 16000)
         mel = audio.melspectrogram(wav)
+        print(mel.shape)
 
-        # mel_chunks 및 프레임 로드
+        if np.isnan(mel.reshape(-1)).sum() > 0:
+            raise ValueError('Mel contains nan! Using a TTS voice? Add a small epsilon noise to the wav file and try again')
+
         mel_chunks = []
         mel_idx_multiplier = 80. / fps
         i = 0
@@ -278,17 +325,23 @@ def main(face_path):
             mel_chunks.append(mel[:, start_idx: start_idx + mel_step_size])
             i += 1
 
+        print("Length of mel chunks: {}".format(len(mel_chunks)))
+
         full_frames = full_frames[:len(mel_chunks)]
+
         batch_size = args.wav2lip_batch_size
         gen = datagen(full_frames.copy(), mel_chunks)
 
-        for i, (img_batch, mel_batch, frames, coords) in enumerate(tqdm(gen, total=int(np.ceil(float(len(mel_chunks)) / batch_size)))):
+        for i, (img_batch, mel_batch, frames, coords) in enumerate(tqdm(gen,
+                                                                        total=int(np.ceil(float(len(mel_chunks)) / batch_size)))):
             if i == 0:
                 model = load_model(args.checkpoint_path)
+                print("Model loaded")
 
                 frame_h, frame_w = full_frames[0].shape[:-1]
                 out = cv2.VideoWriter('temp/result.avi',
-                                      cv2.VideoWriter_fourcc(*'DIVX'), fps, (frame_w, frame_h), isColor=False)  # isColor=False로 명시적으로 설정
+                      cv2.VideoWriter_fourcc(*'DIVX'), fps, (frame_w, frame_h), isColor=False)  # isColor=False로 설정하여 필요한 경우 그레이스케일 픽셀 형식 사용
+
 
             img_batch = torch.FloatTensor(np.transpose(img_batch, (0, 3, 1, 2))).to(device)
             mel_batch = torch.FloatTensor(np.transpose(mel_batch, (0, 3, 1, 2))).to(device)
@@ -314,19 +367,16 @@ def main(face_path):
         audio_filename = os.path.splitext(os.path.basename(audio_file_path))[0]
         result_filename = f'results/result_voice_{audio_filename}.mov'
         command = (
-            'ffmpeg -y -analyzeduration 100M -probesize 100M '
-            '-i {} -i {} -c:v qtrle -pix_fmt yuv420p -c:a copy {}'
-        ).format('temp/result.avi', audio_file_path, result_filename)
+    'ffmpeg -y -analyzeduration 100M -probesize 100M '
+    '-i {} -i {} -c:v qtrle -pix_fmt yuv420p -c:a copy {}'
+).format('temp/result.avi', audio_file_path, result_filename)
 
-        try:
-            subprocess.check_output(command, shell=True, stderr=subprocess.STDOUT)
-        except subprocess.CalledProcessError as e:
-            print(f"Error occurred while running FFmpeg: {e.output.decode()}")
-            raise
+        subprocess.call(command, shell=True)
+
 
         result_filenames.append(result_filename)
 
-    return result_filenames
+    return result_filename
 
 
 
