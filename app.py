@@ -724,8 +724,9 @@ def main(face_path):
                 print ("Model loaded")
 
                 frame_h, frame_w = full_frames[0].shape[:-1]
-                out = cv2.VideoWriter('temp/result.mov', 
-                                        cv2.VideoWriter_fourcc(*'DIVX'), fps, (frame_w, frame_h))
+                # RGBA 형식으로 비디오 저장
+                out = cv2.VideoWriter('temp/result.mov', cv2.VideoWriter_fourcc(*'MP4V'), fps, (frame_w, frame_h), True)
+
 
             img_batch = torch.FloatTensor(np.transpose(img_batch, (0, 3, 1, 2))).to(device)
             mel_batch = torch.FloatTensor(np.transpose(mel_batch, (0, 3, 1, 2))).to(device)
@@ -747,7 +748,7 @@ def main(face_path):
         # 오디오 파일 이름을 기반으로 고유한 결과 파일 이름 생성
         audio_filename = os.path.splitext(os.path.basename(audio_file_path))[0]
         result_filename = f'results/result_voice_{audio_filename}.mov'
-        command = 'ffmpeg -y -i {} -i {} -strict -2 -q:v 1 {}'.format(audio_file_path, 'temp/result.mov', result_filename)
+        command = 'ffmpeg -y -i temp/result.mov -vcodec libx264 -pix_fmt rgba -acodec copy output_with_transparency.mov'
         subprocess.call(command, shell=platform.system() != 'Windows')
 
         result_filenames.append(result_filename)
