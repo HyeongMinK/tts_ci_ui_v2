@@ -350,14 +350,10 @@ def main(face_path):
                 pred = model(mel_batch, img_batch)
 
             pred = pred.cpu().numpy().transpose(0, 2, 3, 1) * 255.
-
+            
             for p, f, c in zip(pred, frames, coords):
                 y1, y2, x1, x2 = c
                 p = cv2.resize(p.astype(np.uint8), (x2 - x1, y2 - y1))
-
-                if p.shape[2] == 3:
-                    alpha_channel = np.ones((p.shape[0], p.shape[1], 1), dtype=p.dtype) * 255
-                    p = np.concatenate([p, alpha_channel], axis=2)
 
                 f[y1:y2, x1:x2] = p
                 out.write(f)
