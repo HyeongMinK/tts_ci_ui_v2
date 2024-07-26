@@ -365,13 +365,14 @@ def main(face_path):
         out.release()
 
         audio_filename = os.path.splitext(os.path.basename(audio_file_path))[0]
-        result_filename = f'results/result_voice_{audio_filename}.mp4'
-        command = 'ffmpeg -y -i {} -i {} -strict -2 -q:v 1 {}'.format(audio_file_path, 'temp/result.avi', result_filename)
+        result_filename = f'results/result_voice_{audio_filename}.mov'
+        command = 'ffmpeg -y -i {} -i {} -strict -2 -q:v 1 -vcodec qtrle {}'.format(audio_file_path, 'temp/result.avi', result_filename)
         subprocess.call(command, shell=platform.system() != 'Windows')
 
         result_filenames.append(result_filename)
 
     return result_filename
+
 
 
 
