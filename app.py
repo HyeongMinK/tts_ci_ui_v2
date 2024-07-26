@@ -193,7 +193,7 @@ def datagen(frames, mels):
             img_masked[:, args.img_size // 2:] = 0
 
             # 8채널 입력 준비 (RGBA + RGBA)
-            img_batch = np.concatenate((img_masked, img_batch), axis=3) / 255.
+            img_batch = np.concatenate((img_masked[:, :, :, :4], img_batch[:, :, :, :4]), axis=3) / 255.
             mel_batch = np.reshape(mel_batch, [len(mel_batch), mel_batch.shape[1], mel_batch.shape[2], 1])
 
             yield img_batch, mel_batch, frame_batch, coords_batch
@@ -205,11 +205,11 @@ def datagen(frames, mels):
         img_masked = img_batch.copy()
         img_masked[:, args.img_size // 2:] = 0
 
-        # 8채널 입력 준비 (RGBA + RGBA)
-        img_batch = np.concatenate((img_masked, img_batch), axis=3) / 255.
+        img_batch = np.concatenate((img_masked[:, :, :, :4], img_batch[:, :, :, :4]), axis=3) / 255.
         mel_batch = np.reshape(mel_batch, [len(mel_batch), mel_batch.shape[1], mel_batch.shape[2], 1])
 
         yield img_batch, mel_batch, frame_batch, coords_batch
+
 
 
 mel_step_size = 16
