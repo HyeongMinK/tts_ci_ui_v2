@@ -372,6 +372,7 @@ def clear_directory(directory):
             except Exception as e:
                 st.error(f"Failed to delete {file_path}. Reason: {e}")
 
+
 def get_audio_html(file_path):
     audio_bytes = open(file_path, "rb").read()
     b64_audio = base64.b64encode(audio_bytes).decode()
