@@ -356,9 +356,12 @@ def main(face_path):
                 p = cv2.resize(p.astype(np.uint8), (x2 - x1, y2 - y1))
 
                 if p.shape[2] == 4:  # 투명 채널이 있는 경우
-                    f[y1:y2, x1:x2, :3] = p[:, :, :3]
-                    f[y1:y2, x1:x2, 3] = p[:, :, 3]
-                else:
+                    if f.shape[2] == 4:  # 원본 프레임도 RGBA인 경우
+                        f[y1:y2, x1:x2, :3] = p[:, :, :3]
+                        f[y1:y2, x1:x2, 3] = p[:, :, 3]
+                    else:  # 원본 프레임이 RGB인 경우
+                        f[y1:y2, x1:x2] = p[:, :, :3]
+                else:  # 투명 채널이 없는 경우
                     f[y1:y2, x1:x2] = p
 
                 out.write(f)
