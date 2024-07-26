@@ -365,7 +365,7 @@ def main(face_path):
         out.release()
 
         audio_filename = os.path.splitext(os.path.basename(audio_file_path))[0]
-        result_filename = f'results/result_voice_{audio_filename}.mov'
+        result_filename = f'results/result_voice_{audio_filename}.mp4'
         command = (
         'ffmpeg -y -analyzeduration 100M -probesize 100M '
         '-i {} -i {} -c:v qtrle -c:a copy -pix_fmt rgba {}'
@@ -375,7 +375,7 @@ def main(face_path):
 
         result_filenames.append(result_filename)
 
-    return 'temp/result.mov'
+    return result_filename
 
 
 
