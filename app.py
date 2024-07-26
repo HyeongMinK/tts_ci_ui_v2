@@ -369,7 +369,7 @@ def main(face_path):
         'ffmpeg -y -analyzeduration 100M -probesize 100M '
         '-i {} -i {} -c:v qtrle -c:a copy -pix_fmt rgba {}'
     ).format('temp/result.avi', audio_file_path, result_filename)
-        subprocess.call(command, shell=platform.system() != 'Windows')
+        subprocess.call(command, shell=True)
 
 
         result_filenames.append(result_filename)
