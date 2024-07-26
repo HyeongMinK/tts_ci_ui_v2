@@ -379,7 +379,7 @@ def main(face_path):
 
         result_filenames.append(result_filename)
 
-    return result_filename
+    return 'temp/result.mov'
 
 
 
