@@ -11,4 +11,5 @@ gdown
 streamlit
 scipy
 pillow
-moviepy
+imageio
+imageio-ffmpeg

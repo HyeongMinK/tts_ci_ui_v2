@@ -638,12 +638,12 @@ def load_model(path):
 
 def main(face_path):
     global full_frames, mel_chunks, model, detector, predictions, boxes
-    args.face=face_path
+    args.face = face_path
     if not os.path.isfile(args.face):
         raise ValueError('--face argument must be a valid path to video/image file')
 
     elif args.face.split('.')[1] in ['jpg', 'png', 'jpeg']:
-        full_frames = [cv2.imread(args.face)]
+        full_frames = [cv2.imread(args.face, cv2.IMREAD_UNCHANGED)]  # RGBA로 읽기
         fps = args.fps
 
     else:
@@ -659,10 +659,10 @@ def main(face_path):
                 video_stream.release()
                 break
             if args.resize_factor > 1:
-                frame = cv2.resize(frame, (frame.shape[1]//args.resize_factor, frame.shape[0]//args.resize_factor))
+                frame = cv2.resize(frame, (frame.shape[1] // args.resize_factor, frame.shape[0] // args.resize_factor))
 
             if args.rotate:
-                frame = cv2.rotate(frame, cv2.cv2.ROTATE_90_CLOCKWISE)
+                frame = cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE)
 
             y1, y2, x1, x2 = args.crop
             if x2 == -1: x2 = frame.shape[1]
@@ -672,24 +672,17 @@ def main(face_path):
 
             full_frames.append(frame)
 
-    print ("Number of frames available for inference: "+str(len(full_frames)))
+    print("Number of frames available for inference: " + str(len(full_frames)))
 
     audio_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "audio_files")
-    
+
     result_filenames = []
-    
-    # audio_files 폴더의 모든 오디오 파일에 대해 처리
+
     for audio_file_name in os.listdir(audio_dir):
         audio_file_path = os.path.join(audio_dir, audio_file_name)
         if not audio_file_path.endswith('.wav'):
             print(f'Skipping non-wav file: {audio_file_path}')
             continue
-
-        if not audio_file_path.endswith('.wav'):
-            print('Extracting raw audio...')
-            command = 'ffmpeg -y -i {} -strict -2 {}'.format(audio_file_path, 'temp/temp.wav')
-            subprocess.call(command, shell=True)
-            audio_file_path = 'temp/temp.wav'
 
         wav = audio.load_wav(audio_file_path, 16000)
         mel = audio.melspectrogram(wav)
@@ -699,14 +692,14 @@ def main(face_path):
             raise ValueError('Mel contains nan! Using a TTS voice? Add a small epsilon noise to the wav file and try again')
 
         mel_chunks = []
-        mel_idx_multiplier = 80./fps 
+        mel_idx_multiplier = 80. / fps
         i = 0
         while 1:
             start_idx = int(i * mel_idx_multiplier)
             if start_idx + mel_step_size > len(mel[0]):
                 mel_chunks.append(mel[:, len(mel[0]) - mel_step_size:])
                 break
-            mel_chunks.append(mel[:, start_idx : start_idx + mel_step_size])
+            mel_chunks.append(mel[:, start_idx: start_idx + mel_step_size])
             i += 1
 
         print("Length of mel chunks: {}".format(len(mel_chunks)))
@@ -716,16 +709,13 @@ def main(face_path):
         batch_size = args.wav2lip_batch_size
         gen = datagen(full_frames.copy(), mel_chunks)
 
-        for i, (img_batch, mel_batch, frames, coords) in enumerate(tqdm(gen, 
-                                                total=int(np.ceil(float(len(mel_chunks))/batch_size)))):
+        video_frames = []  # 비디오 프레임을 저장할 리스트
+
+        for i, (img_batch, mel_batch, frames, coords) in enumerate(tqdm(gen,
+                                                                        total=int(np.ceil(float(len(mel_chunks)) / batch_size)))):
             if i == 0:
                 model = load_model(args.checkpoint_path)
-                print ("Model loaded")
-
-                frame_h, frame_w = full_frames[0].shape[:-1]
-                # RGBA 형식으로 비디오 저장
-                out = cv2.VideoWriter('temp/result.mov', cv2.VideoWriter_fourcc(*'MP4V'), fps, (frame_w, frame_h), True)
-
+                print("Model loaded")
 
             img_batch = torch.FloatTensor(np.transpose(img_batch, (0, 3, 1, 2))).to(device)
             mel_batch = torch.FloatTensor(np.transpose(mel_batch, (0, 3, 1, 2))).to(device)
@@ -734,26 +724,38 @@ def main(face_path):
                 pred = model(mel_batch, img_batch)
 
             pred = pred.cpu().numpy().transpose(0, 2, 3, 1) * 255.
-            
+
             for p, f, c in zip(pred, frames, coords):
                 y1, y2, x1, x2 = c
                 p = cv2.resize(p.astype(np.uint8), (x2 - x1, y2 - y1))
 
-                f[y1:y2, x1:x2] = p
-                out.write(f)
+                if p.shape[2] == 4:  # 투명 채널이 있는 경우
+                    if f.shape[2] == 4:  # 원본 프레임도 RGBA인 경우
+                        f[y1:y2, x1:x2, :3] = p[:, :, :3]
+                        f[y1:y2, x1:x2, 3] = p[:, :, 3]
+                    else:  # 원본 프레임이 RGB인 경우
+                        f[y1:y2, x1:x2] = p[:, :, :3]
+                else:  # 투명 채널이 없는 경우
+                    f[y1:y2, x1:x2] = p
 
-        out.release()
+                video_frames.append(f)
 
-        # 오디오 파일 이름을 기반으로 고유한 결과 파일 이름 생성
+        # moviepy를 사용하여 비디오 생성
+        output_path = 'temp/result.mov'
+        clip = mpy.ImageSequenceClip(video_frames, fps=fps)
+        clip.write_videofile(output_path, codec='libx264', pix_fmt='rgba')
+
         audio_filename = os.path.splitext(os.path.basename(audio_file_path))[0]
         result_filename = f'results/result_voice_{audio_filename}.mov'
-        command = 'ffmpeg -y -i {} -i {} -strict -2 -q:v 1 {} -pix_fmt rgba '.format(audio_file_path, 'temp/result.mov', result_filename)
+        command = (
+            'ffmpeg -y -analyzeduration 100M -probesize 100M '
+            '-i {} -i {} -c:v qtrle -c:a copy -pix_fmt rgba {}'
+        ).format(output_path, audio_file_path, result_filename)
         subprocess.call(command, shell=platform.system() != 'Windows')
 
         result_filenames.append(result_filename)
 
-    
-    return result_filename
+    return result_filenames
 
 # 폴더 내의 모든 파일 삭제 함수
 def clear_directory(directory):
