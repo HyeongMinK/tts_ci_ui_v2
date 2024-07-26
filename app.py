@@ -340,7 +340,7 @@ def main(face_path):
 
                 frame_h, frame_w = full_frames[0].shape[:-1]
                 out = cv2.VideoWriter('temp/result.avi',
-                                      cv2.VideoWriter_fourcc(*'DIVX'), fps, (frame_w, frame_h))
+                                      cv2.VideoWriter_fourcc(*'DIVX'), fps, (frame_w, frame_h), True)
 
             img_batch = torch.FloatTensor(np.transpose(img_batch, (0, 3, 1, 2))).to(device)
             mel_batch = torch.FloatTensor(np.transpose(mel_batch, (0, 3, 1, 2))).to(device)
@@ -354,9 +354,8 @@ def main(face_path):
                 y1, y2, x1, x2 = c
                 p = cv2.resize(p.astype(np.uint8), (x2 - x1, y2 - y1))
 
-                # RGB 출력에서 알파 채널 추가
                 if p.shape[2] == 3:
-                    alpha_channel = np.ones((p.shape[0], p.shape[1], 1), dtype=p.dtype) * 255  # 완전 불투명
+                    alpha_channel = np.ones((p.shape[0], p.shape[1], 1), dtype=p.dtype) * 255
                     p = np.concatenate([p, alpha_channel], axis=2)
 
                 f[y1:y2, x1:x2] = p
@@ -366,7 +365,7 @@ def main(face_path):
 
         audio_filename = os.path.splitext(os.path.basename(audio_file_path))[0]
         result_filename = f'results/result_voice_{audio_filename}.mov'
-        command = 'ffmpeg -y -i {} -i {} -strict -2 -q:v 1 -vcodec qtrle {}'.format(audio_file_path, 'temp/result.avi', result_filename)
+        command = 'ffmpeg -y -i {} -i {} -c:v qtrle -c:a copy {}'.format(audio_file_path, 'temp/result.avi', result_filename)
         subprocess.call(command, shell=platform.system() != 'Windows')
 
         result_filenames.append(result_filename)
