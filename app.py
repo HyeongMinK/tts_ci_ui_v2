@@ -295,7 +295,6 @@ def main(face_path):
 
     result_filenames = []
 
-    # audio_files 폴더의 모든 오디오 파일에 대해 처리
     for audio_file_name in os.listdir(audio_dir):
         audio_file_path = os.path.join(audio_dir, audio_file_name)
         if not audio_file_path.endswith('.wav'):
@@ -355,6 +354,11 @@ def main(face_path):
                 y1, y2, x1, x2 = c
                 p = cv2.resize(p.astype(np.uint8), (x2 - x1, y2 - y1))
 
+                # RGB 출력에서 알파 채널 추가
+                if p.shape[2] == 3:
+                    alpha_channel = np.ones((p.shape[0], p.shape[1], 1), dtype=p.dtype) * 255  # 완전 불투명
+                    p = np.concatenate([p, alpha_channel], axis=2)
+
                 f[y1:y2, x1:x2] = p
                 out.write(f)
 
@@ -367,7 +371,8 @@ def main(face_path):
 
         result_filenames.append(result_filename)
 
-    return result_filenames
+    return result_filename
+
 
 
 # 폴더 내의 모든 파일 삭제 함수
