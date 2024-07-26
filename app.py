@@ -303,9 +303,9 @@ def main(face_path):
 
         if not audio_file_path.endswith('.wav'):
             print('Extracting raw audio...')
-            command = 'ffmpeg -y -i {} -strict -2 {}'.format(audio_file_path, 'temp/temp.wav')
+            command = 'ffmpeg -y -i {} -strict -2 {}'.format(audio_file_path, 'temp/temp.mov')
             subprocess.call(command, shell=True)
-            audio_file_path = 'temp/temp.wav'
+            audio_file_path = 'temp/temp.mov'
 
         wav = audio.load_wav(audio_file_path, 16000)
         mel = audio.melspectrogram(wav)
@@ -746,7 +746,7 @@ def main(face_path):
 
         # 오디오 파일 이름을 기반으로 고유한 결과 파일 이름 생성
         audio_filename = os.path.splitext(os.path.basename(audio_file_path))[0]
-        result_filename = f'results/result_voice_{audio_filename}.mp4'
+        result_filename = f'results/result_voice_{audio_filename}.mov'
         command = 'ffmpeg -y -i {} -i {} -strict -2 -q:v 1 {}'.format(audio_file_path, 'temp/result.avi', result_filename)
         subprocess.call(command, shell=platform.system() != 'Windows')
 
@@ -881,7 +881,7 @@ if __name__ == '__main__':
                             label=f"Download {os.path.basename(result_filename)}",
                             data=f,
                             file_name=os.path.basename(result_filename),
-                            mime="video/mp4"
+                            mime="video/mov"
                         )
 st.markdown(
     """
