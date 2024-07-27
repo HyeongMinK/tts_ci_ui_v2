@@ -14,6 +14,7 @@ import argparse
 import audio
 from PIL import Image
 import base64
+import imageio
 
 audio_ex_files = {
     "Alloy": "audio_sample/alloy.mp3",
@@ -333,15 +334,13 @@ def main(face_path):
         batch_size = args.wav2lip_batch_size
         gen = datagen(full_frames.copy(), mel_chunks, full_frames_rgb.copy())
 
+        writer = imageio.get_writer('temp/result_rgba.mp4', fps=fps, codec='libx264', quality=10)
+
         for i, (img_batch_8ch, img_batch_6ch, mel_batch, frames, coords) in enumerate(tqdm(gen,
                                                                         total=int(np.ceil(float(len(mel_chunks)) / batch_size)))):
             if i == 0:
                 model = load_model(args.checkpoint_path)
                 print("Model loaded")
-
-                frame_h, frame_w = full_frames[0].shape[:-1]
-                out = cv2.VideoWriter('temp/result.avi',
-                                      cv2.VideoWriter_fourcc(*'DIVX'), fps, (frame_w, frame_h))
 
             img_batch_6ch = torch.FloatTensor(np.transpose(img_batch_6ch, (0, 3, 1, 2))).to(device)
             mel_batch = torch.FloatTensor(np.transpose(mel_batch, (0, 3, 1, 2))).to(device)
@@ -361,19 +360,19 @@ def main(face_path):
                     p_with_alpha = np.dstack((p[:, :, :3], alpha_channel))  # p의 RGB와 원본의 Alpha 채널 결합
                     f[y1:y2, x1:x2] = p_with_alpha  # 결합된 결과를 f에 적용
 
-                out.write(f)
+                writer.append_data(f)
 
-        out.release()
+        writer.close()
 
         # 오디오 파일 이름을 기반으로 고유한 결과 파일 이름 생성
         audio_filename = os.path.splitext(os.path.basename(audio_file_path))[0]
         result_filename = f'results/result_voice_{audio_filename}.mp4'
-        command = 'ffmpeg -y -i {} -i {} -strict -2 -q:v 1 {}'.format(audio_file_path, 'temp/result.avi', result_filename)
+        command = 'ffmpeg -y -i {} -i {} -strict -2 -q:v 1 {}'.format(audio_file_path, 'temp/result_rgba.mp4', result_filename)
         subprocess.call(command, shell=platform.system() != 'Windows')
 
         result_filenames.append(result_filename)
 
-    return gen
+    return result_filename
 
 
 # 폴더 내의 모든 파일 삭제 함수
