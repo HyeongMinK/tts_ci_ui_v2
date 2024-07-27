@@ -159,18 +159,19 @@ def face_detect(images):
     del detector
     return results 
 
-def datagen(frames, mels):
+def datagen(frames, mels, frames_rgb):
     img_batch, mel_batch, frame_batch, coords_batch = [], [], [], []
+    img_batch_rgb = []
 
     if args.box[0] == -1:
         if not args.static:
-            face_det_results = face_detect(frames)  # 얼굴 인식 수행
+            face_det_results = face_detect(frames_rgb)  # 얼굴 인식 수행
         else:
-            face_det_results = face_detect([frames[0]])
+            face_det_results = face_detect([frames_rgb[0]])
     else:
         print('Using the specified bounding box instead of face detection...')
         y1, y2, x1, x2 = args.box
-        face_det_results = [[f[y1: y2, x1: x2], (y1, y2, x1, x2)] for f in frames]
+        face_det_results = [[f[y1: y2, x1: x2], (y1, y2, x1, x2)] for f in frames_rgb]
 
     for i, m in enumerate(mels):
         idx = 0 if args.static else i % len(frames)
@@ -180,40 +181,34 @@ def datagen(frames, mels):
         face = cv2.resize(face, (args.img_size, args.img_size))
 
         img_batch.append(face)
+        img_batch_rgb.append(cv2.cvtColor(face, cv2.COLOR_BGRA2BGR))  # RGB 이미지 생성
         mel_batch.append(m)
         frame_batch.append(frame_to_save)
         coords_batch.append(coords)
 
         if len(img_batch) >= args.wav2lip_batch_size:
-            img_batch, mel_batch = np.asarray(img_batch), np.asarray(mel_batch)
+            img_batch, mel_batch, img_batch_rgb = np.asarray(img_batch), np.asarray(mel_batch), np.asarray(img_batch_rgb)
 
             img_masked = img_batch.copy()
             img_masked[:, args.img_size // 2:] = 0
 
-            # 3채널로 변환 (RGBA -> RGB)
-            img_batch = img_batch[:, :, :, :3]
-            img_masked = img_masked[:, :, :, :3]
-
-            # 6채널 입력 준비 (RGB + RGB)
-            img_batch = np.concatenate((img_masked, img_batch), axis=3) / 255.
+            # 8채널 입력 준비 (RGBA + RGBA)
+            img_batch = np.concatenate((img_masked[:, :, :, :4], img_batch[:, :, :, :4]), axis=3) / 255.
             mel_batch = np.reshape(mel_batch, [len(mel_batch), mel_batch.shape[1], mel_batch.shape[2], 1])
 
-            yield img_batch, mel_batch, frame_batch, coords_batch
-            img_batch, mel_batch, frame_batch, coords_batch = [], [], [], []
+            yield img_batch, mel_batch, img_batch_rgb, frame_batch, coords_batch
+            img_batch, mel_batch, img_batch_rgb, frame_batch, coords_batch = [], [], [], [], []
 
     if len(img_batch) > 0:
-        img_batch, mel_batch = np.asarray(img_batch), np.asarray(mel_batch)
+        img_batch, mel_batch, img_batch_rgb = np.asarray(img_batch), np.asarray(mel_batch), np.asarray(img_batch_rgb)
 
         img_masked = img_batch.copy()
         img_masked[:, args.img_size // 2:] = 0
 
-        img_batch = img_batch[:, :, :, :3]
-        img_masked = img_masked[:, :, :, :3]
-
-        img_batch = np.concatenate((img_masked, img_batch), axis=3) / 255.
+        img_batch = np.concatenate((img_masked[:, :, :, :4], img_batch[:, :, :, :4]), axis=3) / 255.
         mel_batch = np.reshape(mel_batch, [len(mel_batch), mel_batch.shape[1], mel_batch.shape[2], 1])
 
-        yield img_batch, mel_batch, frame_batch, coords_batch
+        yield img_batch, mel_batch, img_batch_rgb, frame_batch, coords_batch
 
 mel_step_size = 16
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -245,7 +240,7 @@ def load_model(path):
 
 def main(face_path):
     global full_frames, mel_chunks, model, detector, predictions, boxes
-    args.face=face_path
+    args.face = face_path
     if not os.path.isfile(args.face):
         raise ValueError('--face argument must be a valid path to video/image file')
 
@@ -266,10 +261,10 @@ def main(face_path):
                 video_stream.release()
                 break
             if args.resize_factor > 1:
-                frame = cv2.resize(frame, (frame.shape[1]//args.resize_factor, frame.shape[0]//args.resize_factor))
+                frame = cv2.resize(frame, (frame.shape[1] // args.resize_factor, frame.shape[0] // args.resize_factor))
 
             if args.rotate:
-                frame = cv2.rotate(frame, cv2.cv2.ROTATE_90_CLOCKWISE)
+                frame = cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE)
 
             y1, y2, x1, x2 = args.crop
             if x2 == -1: x2 = frame.shape[1]
@@ -279,12 +274,21 @@ def main(face_path):
 
             full_frames.append(frame)
 
-    print ("Number of frames available for inference: "+str(len(full_frames)))
+    # RGBA to RGB 변환
+    full_frames_rgb = []
+    for frame in full_frames:
+        if frame.shape[2] == 4:
+            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGRA2BGR)
+        else:
+            frame_rgb = frame
+        full_frames_rgb.append(frame_rgb)
+
+    print("Number of frames available for inference: " + str(len(full_frames_rgb)))
 
     audio_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "audio_files")
-    
+
     result_filenames = []
-    
+
     # audio_files 폴더의 모든 오디오 파일에 대해 처리
     for audio_file_name in os.listdir(audio_dir):
         audio_file_path = os.path.join(audio_dir, audio_file_name)
@@ -306,41 +310,42 @@ def main(face_path):
             raise ValueError('Mel contains nan! Using a TTS voice? Add a small epsilon noise to the wav file and try again')
 
         mel_chunks = []
-        mel_idx_multiplier = 80./fps 
+        mel_idx_multiplier = 80. / fps
         i = 0
         while 1:
             start_idx = int(i * mel_idx_multiplier)
             if start_idx + mel_step_size > len(mel[0]):
                 mel_chunks.append(mel[:, len(mel[0]) - mel_step_size:])
                 break
-            mel_chunks.append(mel[:, start_idx : start_idx + mel_step_size])
+            mel_chunks.append(mel[:, start_idx: start_idx + mel_step_size])
             i += 1
 
         print("Length of mel chunks: {}".format(len(mel_chunks)))
 
         full_frames = full_frames[:len(mel_chunks)]
+        full_frames_rgb = full_frames_rgb[:len(mel_chunks)]
 
         batch_size = args.wav2lip_batch_size
-        gen = datagen(full_frames.copy(), mel_chunks)
+        gen = datagen(full_frames.copy(), mel_chunks, full_frames_rgb.copy())
 
-        for i, (img_batch, mel_batch, frames, coords) in enumerate(tqdm(gen, 
-                                                total=int(np.ceil(float(len(mel_chunks))/batch_size)))):
+        for i, (img_batch, mel_batch, img_batch_rgb, frames, coords) in enumerate(tqdm(gen,
+                                                                        total=int(np.ceil(float(len(mel_chunks)) / batch_size)))):
             if i == 0:
                 model = load_model(args.checkpoint_path)
-                print ("Model loaded")
+                print("Model loaded")
 
                 frame_h, frame_w = full_frames[0].shape[:-1]
-                out = cv2.VideoWriter('temp/result.avi', 
-                                        cv2.VideoWriter_fourcc(*'DIVX'), fps, (frame_w, frame_h))
+                out = cv2.VideoWriter('temp/result.avi',
+                                      cv2.VideoWriter_fourcc(*'DIVX'), fps, (frame_w, frame_h))
 
-            img_batch = torch.FloatTensor(np.transpose(img_batch, (0, 3, 1, 2))).to(device)
+            img_batch_rgb = torch.FloatTensor(np.transpose(img_batch_rgb, (0, 3, 1, 2))).to(device)
             mel_batch = torch.FloatTensor(np.transpose(mel_batch, (0, 3, 1, 2))).to(device)
 
             with torch.no_grad():
-                pred = model(mel_batch, img_batch)
+                pred = model(mel_batch, img_batch_rgb)
 
             pred = pred.cpu().numpy().transpose(0, 2, 3, 1) * 255.
-            
+
             for p, f, c in zip(pred, frames, coords):
                 y1, y2, x1, x2 = c
                 p = cv2.resize(p.astype(np.uint8), (x2 - x1, y2 - y1))
@@ -358,7 +363,6 @@ def main(face_path):
 
         result_filenames.append(result_filename)
 
-    
     return result_filename
 
 # 폴더 내의 모든 파일 삭제 함수
