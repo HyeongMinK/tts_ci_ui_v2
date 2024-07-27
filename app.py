@@ -161,7 +161,6 @@ def face_detect(images):
 
 def datagen(frames, mels, frames_rgb):
     img_batch, mel_batch, frame_batch, coords_batch = [], [], [], []
-    img_batch_rgb = []
 
     if args.box[0] == -1:
         if not args.static:
@@ -181,13 +180,12 @@ def datagen(frames, mels, frames_rgb):
         face = cv2.resize(face, (args.img_size, args.img_size))
 
         img_batch.append(face)
-        img_batch_rgb.append(cv2.cvtColor(face, cv2.COLOR_BGRA2BGR))  # RGB 이미지 생성
         mel_batch.append(m)
         frame_batch.append(frame_to_save)
         coords_batch.append(coords)
 
         if len(img_batch) >= args.wav2lip_batch_size:
-            img_batch, mel_batch, img_batch_rgb = np.asarray(img_batch), np.asarray(mel_batch), np.asarray(img_batch_rgb)
+            img_batch, mel_batch = np.asarray(img_batch), np.asarray(mel_batch)
 
             img_masked = img_batch.copy()
             img_masked[:, args.img_size // 2:] = 0
@@ -196,11 +194,11 @@ def datagen(frames, mels, frames_rgb):
             img_batch = np.concatenate((img_masked[:, :, :, :4], img_batch[:, :, :, :4]), axis=3) / 255.
             mel_batch = np.reshape(mel_batch, [len(mel_batch), mel_batch.shape[1], mel_batch.shape[2], 1])
 
-            yield img_batch, mel_batch, img_batch_rgb, frame_batch, coords_batch
-            img_batch, mel_batch, img_batch_rgb, frame_batch, coords_batch = [], [], [], [], []
+            yield img_batch, mel_batch, frame_batch, coords_batch
+            img_batch, mel_batch, frame_batch, coords_batch = [], [], [], []
 
     if len(img_batch) > 0:
-        img_batch, mel_batch, img_batch_rgb = np.asarray(img_batch), np.asarray(mel_batch), np.asarray(img_batch_rgb)
+        img_batch, mel_batch = np.asarray(img_batch), np.asarray(mel_batch)
 
         img_masked = img_batch.copy()
         img_masked[:, args.img_size // 2:] = 0
@@ -208,7 +206,8 @@ def datagen(frames, mels, frames_rgb):
         img_batch = np.concatenate((img_masked[:, :, :, :4], img_batch[:, :, :, :4]), axis=3) / 255.
         mel_batch = np.reshape(mel_batch, [len(mel_batch), mel_batch.shape[1], mel_batch.shape[2], 1])
 
-        yield img_batch, mel_batch, img_batch_rgb, frame_batch, coords_batch
+        yield img_batch, mel_batch, frame_batch, coords_batch
+
 
 mel_step_size = 16
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -328,7 +327,7 @@ def main(face_path):
         batch_size = args.wav2lip_batch_size
         gen = datagen(full_frames.copy(), mel_chunks, full_frames_rgb.copy())
 
-        for i, (img_batch, mel_batch, img_batch_rgb, frames, coords) in enumerate(tqdm(gen,
+        for i, (img_batch, mel_batch, frames, coords) in enumerate(tqdm(gen,
                                                                         total=int(np.ceil(float(len(mel_chunks)) / batch_size)))):
             if i == 0:
                 model = load_model(args.checkpoint_path)
@@ -338,11 +337,11 @@ def main(face_path):
                 out = cv2.VideoWriter('temp/result.avi',
                                       cv2.VideoWriter_fourcc(*'DIVX'), fps, (frame_w, frame_h))
 
-            img_batch_rgb = torch.FloatTensor(np.transpose(img_batch_rgb, (0, 3, 1, 2))).to(device)
+            img_batch = torch.FloatTensor(np.transpose(img_batch, (0, 3, 1, 2))).to(device)
             mel_batch = torch.FloatTensor(np.transpose(mel_batch, (0, 3, 1, 2))).to(device)
 
             with torch.no_grad():
-                pred = model(mel_batch, img_batch_rgb)
+                pred = model(mel_batch, img_batch)
 
             pred = pred.cpu().numpy().transpose(0, 2, 3, 1) * 255.
 
