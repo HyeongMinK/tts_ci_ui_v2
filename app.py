@@ -242,7 +242,7 @@ def main(face_path):
         raise ValueError('--face argument must be a valid path to video/image file')
 
     elif args.face.split('.')[1] in ['jpg', 'png', 'jpeg']:
-        full_frames = [cv2.imread(args.face)]
+        full_frames = [cv2.imread(args.face, cv2.IMREAD_UNCHANGED)]  # RGBA로 읽기
         fps = args.fps
 
     else:
@@ -351,7 +351,7 @@ def main(face_path):
         result_filenames.append(result_filename)
 
     
-    return result_filename
+    return gen
 
 # 폴더 내의 모든 파일 삭제 함수
 def clear_directory(directory):
