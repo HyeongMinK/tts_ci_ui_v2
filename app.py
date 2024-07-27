@@ -305,7 +305,8 @@ def main(face_path):
         batch_size = args.wav2lip_batch_size
         gen = datagen(full_frames.copy(), mel_chunks)
 
-        for i, (img_batch, mel_batch, frames, coords) in enumerate(gen):
+        for i, (img_batch, mel_batch, frames, coords) in enumerate(tqdm(gen, 
+                                                total=int(np.ceil(float(len(mel_chunks))/batch_size)))):
             if i == 0:
                 model = load_model(args.checkpoint_path)
                 print ("Model loaded")
