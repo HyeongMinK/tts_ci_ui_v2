@@ -160,7 +160,7 @@ def face_detect(images):
     return results 
 
 def datagen(frames, mels, frames_rgb):
-    img_batch, mel_batch, frame_batch, coords_batch = [], [], [], []
+    img_batch, mel_batch, img_batch_rgb, frame_batch, coords_batch = [], [], [], [], []
 
     if args.box[0] == -1:
         if not args.static:
@@ -178,35 +178,40 @@ def datagen(frames, mels, frames_rgb):
         face, coords = face_det_results[idx].copy()
 
         face = cv2.resize(face, (args.img_size, args.img_size))
+        face_rgb = cv2.resize(frames_rgb[idx][coords[1]:coords[3], coords[0]:coords[2]], (args.img_size, args.img_size))
 
         img_batch.append(face)
         mel_batch.append(m)
         frame_batch.append(frame_to_save)
         coords_batch.append(coords)
+        img_batch_rgb.append(face_rgb)
 
         if len(img_batch) >= args.wav2lip_batch_size:
-            img_batch, mel_batch = np.asarray(img_batch), np.asarray(mel_batch)
+            img_batch, mel_batch, img_batch_rgb = np.asarray(img_batch), np.asarray(mel_batch), np.asarray(img_batch_rgb)
 
             img_masked = img_batch.copy()
             img_masked[:, args.img_size // 2:] = 0
 
             # 8채널 입력 준비 (RGBA + RGBA)
-            img_batch = np.concatenate((img_masked[:, :, :, :4], img_batch[:, :, :, :4]), axis=3) / 255.
+            img_batch_8ch = np.concatenate((img_masked[:, :, :, :4], img_batch[:, :, :, :4]), axis=3) / 255.
+            img_batch_6ch = np.concatenate((img_masked[:, :, :, :3], img_batch[:, :, :, :3]), axis=3) / 255.
             mel_batch = np.reshape(mel_batch, [len(mel_batch), mel_batch.shape[1], mel_batch.shape[2], 1])
 
-            yield img_batch, mel_batch, frame_batch, coords_batch
-            img_batch, mel_batch, frame_batch, coords_batch = [], [], [], []
+            yield img_batch_8ch, img_batch_6ch, mel_batch, frame_batch, coords_batch
+            img_batch, mel_batch, img_batch_rgb, frame_batch, coords_batch = [], [], [], [], []
 
     if len(img_batch) > 0:
-        img_batch, mel_batch = np.asarray(img_batch), np.asarray(mel_batch)
+        img_batch, mel_batch, img_batch_rgb = np.asarray(img_batch), np.asarray(mel_batch), np.asarray(img_batch_rgb)
 
         img_masked = img_batch.copy()
         img_masked[:, args.img_size // 2:] = 0
 
-        img_batch = np.concatenate((img_masked[:, :, :, :4], img_batch[:, :, :, :4]), axis=3) / 255.
+        img_batch_8ch = np.concatenate((img_masked[:, :, :, :4], img_batch[:, :, :, :4]), axis=3) / 255.
+        img_batch_6ch = np.concatenate((img_masked[:, :, :, :3], img_batch[:, :, :, :3]), axis=3) / 255.
         mel_batch = np.reshape(mel_batch, [len(mel_batch), mel_batch.shape[1], mel_batch.shape[2], 1])
 
-        yield img_batch, mel_batch, frame_batch, coords_batch
+        yield img_batch_8ch, img_batch_6ch, mel_batch, frame_batch, coords_batch
+
 
 
 mel_step_size = 16
@@ -327,7 +332,7 @@ def main(face_path):
         batch_size = args.wav2lip_batch_size
         gen = datagen(full_frames.copy(), mel_chunks, full_frames_rgb.copy())
 
-        for i, (img_batch, mel_batch, frames, coords) in enumerate(tqdm(gen,
+        for i, (img_batch_8ch, img_batch_6ch, mel_batch, frames, coords) in enumerate(tqdm(gen,
                                                                         total=int(np.ceil(float(len(mel_chunks)) / batch_size)))):
             if i == 0:
                 model = load_model(args.checkpoint_path)
@@ -337,11 +342,11 @@ def main(face_path):
                 out = cv2.VideoWriter('temp/result.avi',
                                       cv2.VideoWriter_fourcc(*'DIVX'), fps, (frame_w, frame_h))
 
-            img_batch = torch.FloatTensor(np.transpose(img_batch, (0, 3, 1, 2))).to(device)
-            mel_batch = torch.FloatTensor(np.transpose(mel_batch, (0, 3, 1, 2))).to(device)
+            img_batch_6ch = torch.FloatTensor(np.transpose(img_batch_6ch, (0, 3, 1, 2))).to(device)
+            mel_batch = torch.FloatFloatior(np.transpose(mel_batch, (0, 3, 1, 2))).to(device)
 
             with torch.no_grad():
-                pred = model(mel_batch, img_batch)
+                pred = model(mel_batch, img_batch_6ch)
 
             pred = pred.cpu().numpy().transpose(0, 2, 3, 1) * 255.
 
@@ -349,7 +354,9 @@ def main(face_path):
                 y1, y2, x1, x2 = c
                 p = cv2.resize(p.astype(np.uint8), (x2 - x1, y2 - y1))
 
-                f[y1:y2, x1:x2] = p
+                f[y1:y2, x1:x2, :3] = p[:, :, :3]  # 예측 결과의 RGB 채널을 적용
+                f[y1:y2, x1:x2, 3] = img_batch_8ch[idx, y1:y2, x1:x2, 3]  # 원본의 Alpha 채널을 유지
+
                 out.write(f)
 
         out.release()
@@ -363,6 +370,7 @@ def main(face_path):
         result_filenames.append(result_filename)
 
     return result_filename
+
 
 # 폴더 내의 모든 파일 삭제 함수
 def clear_directory(directory):
