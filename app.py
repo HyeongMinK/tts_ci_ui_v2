@@ -357,7 +357,9 @@ def main(face_path):
 
                 f[y1:y2, x1:x2, :3] = p[:, :, :3]  # 예측 결과의 RGB 채널을 적용
                 if f.shape[2] == 4:
-                    f[y1:y2, x1:x2, 3] = img_batch_8ch[i, y1:y2, x1:x2, 3]  # 원본의 Alpha 채널을 유지
+                    alpha_channel = f[y1:y2, x1:x2, 3]  # 원본의 Alpha 채널 가져오기
+                    p_with_alpha = np.dstack((p[:, :, :3], alpha_channel))  # p의 RGB와 원본의 Alpha 채널 결합
+                    f[y1:y2, x1:x2] = p_with_alpha  # 결합된 결과를 f에 적용
 
                 out.write(f)
 
