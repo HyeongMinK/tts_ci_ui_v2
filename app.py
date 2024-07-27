@@ -343,7 +343,7 @@ def main(face_path):
                                       cv2.VideoWriter_fourcc(*'DIVX'), fps, (frame_w, frame_h))
 
             img_batch_6ch = torch.FloatTensor(np.transpose(img_batch_6ch, (0, 3, 1, 2))).to(device)
-            mel_batch = torch.FloatFloatior(np.transpose(mel_batch, (0, 3, 1, 2))).to(device)
+            mel_batch = torch.FloatTensor(np.transpose(mel_batch, (0, 3, 1, 2))).to(device)
 
             with torch.no_grad():
                 pred = model(mel_batch, img_batch_6ch)
