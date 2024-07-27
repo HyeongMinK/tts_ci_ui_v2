@@ -355,7 +355,8 @@ def main(face_path):
                 p = cv2.resize(p.astype(np.uint8), (x2 - x1, y2 - y1))
 
                 f[y1:y2, x1:x2, :3] = p[:, :, :3]  # 예측 결과의 RGB 채널을 적용
-                f[y1:y2, x1:x2, 3] = img_batch_8ch[idx, y1:y2, x1:x2, 3]  # 원본의 Alpha 채널을 유지
+                if f.shape[2] == 4:
+                    f[y1:y2, x1:x2, 3] = img_batch_8ch[i, y1:y2, x1:x2, 3]  # 원본의 Alpha 채널을 유지
 
                 out.write(f)
 
