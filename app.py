@@ -357,7 +357,7 @@ def main(face_path):
 
                 f[y1:y2, x1:x2, :3] = p[:, :, :3]  # 예측 결과의 RGB 채널을 적용
                 if f.shape[2] == 4:
-                    f[y1:y2, x1:x2, 3] = img_batch_8ch[j, y1:y2, x1:x2, 3]  # 원본의 Alpha 채널을 유지
+                    f[y1:y2, x1:x2, 3] = img_batch_8ch[i, y1:y2, x1:x2, 3]  # 원본의 Alpha 채널을 유지
 
                 out.write(f)
 
