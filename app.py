@@ -175,10 +175,11 @@ def datagen(frames, mels, frames_rgb):
     for i, m in enumerate(mels):
         idx = 0 if args.static else i % len(frames)
         frame_to_save = frames[idx].copy()
-        face, coords = face_det_results[idx].copy()
+        face_rgb, coords = face_det_results[idx].copy()
 
-        face = cv2.resize(face, (args.img_size, args.img_size))
-        face_rgb = cv2.resize(frames_rgb[idx][coords[1]:coords[3], coords[0]:coords[2]], (args.img_size, args.img_size))
+        face_rgb = cv2.resize(face_rgb, (args.img_size, args.img_size))
+        face = cv2.resize(frames[idx][coords[1]:coords[3], coords[0]:coords[2]], (args.img_size, args.img_size))
+
 
         img_batch.append(face)
         mel_batch.append(m)
