@@ -305,8 +305,8 @@ def main(face_path):
         batch_size = args.wav2lip_batch_size
         gen = datagen(full_frames.copy(), mel_chunks)
 
-        for i, (img_batch, mel_batch, frames, coords) in enumerate(tqdm(gen, 
-                                                total=int(np.ceil(float(len(mel_chunks))/batch_size)))):
+        for i, (img_batch, mel_batch, frames, coords) in enumerate(gen, 
+                                                total=int(np.ceil(float(len(mel_chunks))/batch_size))):
             if i == 0:
                 model = load_model(args.checkpoint_path)
                 print ("Model loaded")
@@ -341,7 +341,7 @@ def main(face_path):
         result_filenames.append(result_filename)
 
     
-    return result_filename
+    return 'temp/result.avi'
 
 # 폴더 내의 모든 파일 삭제 함수
 def clear_directory(directory):
